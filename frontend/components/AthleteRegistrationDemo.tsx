@@ -1,5 +1,6 @@
 "use client";
 
+// Athlete registration demo component with FHE encryption
 import React, { useState, useRef } from "react";
 import { useFhevm } from "../fhevm/useFhevm";
 import { useInMemoryStorage } from "../hooks/useInMemoryStorage";
