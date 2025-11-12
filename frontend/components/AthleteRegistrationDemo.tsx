@@ -56,6 +56,8 @@ export const AthleteRegistrationDemo = () => {
   // Enable FHEVM only when user is connected and ready to use it
   // Add a small delay to avoid immediate network requests on page load
   const [fhevmDelayPassed, setFhevmDelayPassed] = useState(false);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   React.useEffect(() => {
     const timer = setTimeout(() => setFhevmDelayPassed(true), 1000);
     return () => clearTimeout(timer);
