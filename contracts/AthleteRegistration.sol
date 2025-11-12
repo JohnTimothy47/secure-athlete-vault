@@ -45,6 +45,9 @@ contract AthleteRegistration is SepoliaConfig {
     /// @notice Array to track all registered athletes
     address[] private registeredAthletes;
 
+    /// @notice Total number of registered athletes
+    uint256 public totalAthletes;
+
     /// @notice Event emitted when an athlete registers
     event AthleteRegistered(address indexed athlete, SportCategory category, uint256 timestamp);
 
@@ -62,6 +65,9 @@ contract AthleteRegistration is SepoliaConfig {
         categoryMinAges[SportCategory.Endurance] = 12;
         categoryMinAges[SportCategory.Combat] = 14;
         categoryMinAges[SportCategory.Other] = 8;
+
+        // Initialize athlete counter
+        totalAthletes = 0;
     }
 
     /// @notice Register athlete with FHE encrypted data
@@ -101,6 +107,7 @@ contract AthleteRegistration is SepoliaConfig {
         });
 
         registeredAthletes.push(msg.sender);
+        totalAthletes++;
 
         emit AthleteRegistered(msg.sender, sportCategory, block.timestamp);
     }
@@ -135,6 +142,7 @@ contract AthleteRegistration is SepoliaConfig {
         });
 
         registeredAthletes.push(msg.sender);
+        totalAthletes++;
 
         emit AthleteRegistered(msg.sender, sportCategory, block.timestamp);
     }
