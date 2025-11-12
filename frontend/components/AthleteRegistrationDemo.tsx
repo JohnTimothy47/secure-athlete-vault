@@ -131,7 +131,7 @@ export const AthleteRegistrationDemo = () => {
   };
 
   const handleRegister = async () => {
-    if (!formData.name || !formData.age) {
+    if (!formData.name || !formData.age || !formData.contact) {
       alert("Please fill in all fields");
       return;
     }
