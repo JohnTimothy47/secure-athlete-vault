@@ -1,5 +1,6 @@
 "use client";
 
+// Enhanced hooks for athlete registration with improved TypeScript types and error handling
 import { ethers } from "ethers";
 import {
   RefObject,
