@@ -95,6 +95,10 @@ contract AthleteRegistration is SepoliaConfig {
         uint8 _sportCategory
     ) external {
         require(!athleteRegistrations[msg.sender].isRegistered, "Athlete already registered");
+        require(nameInputProof.length > 0, "Name input proof cannot be empty");
+        require(ageInputProof.length > 0, "Age input proof cannot be empty");
+        require(contactInputProof.length > 0, "Contact input proof cannot be empty");
+        require(_sportCategory >= 0 && _sportCategory <= 4, "Invalid sport category");
 
         SportCategory sportCategory = SportCategory(_sportCategory);
 
@@ -131,6 +135,10 @@ contract AthleteRegistration is SepoliaConfig {
         uint8 _sportCategory
     ) external {
         require(!athleteRegistrations[msg.sender].isRegistered, "Athlete already registered");
+        require(nameInputProof.length > 0, "Name input proof cannot be empty");
+        require(ageInputProof.length > 0, "Age input proof cannot be empty");
+        require(contactInputProof.length > 0, "Contact input proof cannot be empty");
+        require(_sportCategory >= 0 && _sportCategory <= 4, "Invalid sport category");
 
         SportCategory sportCategory = SportCategory(_sportCategory);
 
