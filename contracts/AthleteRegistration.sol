@@ -48,6 +48,9 @@ contract AthleteRegistration is SepoliaConfig {
     /// @notice Total number of registered athletes
     uint256 public totalAthletes;
 
+    /// @notice Authorized operators who can perform administrative operations
+    mapping(address => bool) public authorizedOperators;
+
     /// @notice Event emitted when an athlete registers
     event AthleteRegistered(address indexed athlete, SportCategory category, uint256 timestamp);
 
@@ -68,6 +71,9 @@ contract AthleteRegistration is SepoliaConfig {
 
         // Initialize athlete counter
         totalAthletes = 0;
+
+        // Initialize authorized operators
+        authorizedOperators[msg.sender] = true;
     }
 
     /// @notice Register athlete with FHE encrypted data
