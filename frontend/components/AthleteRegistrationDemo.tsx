@@ -58,6 +58,7 @@ export const AthleteRegistrationDemo = () => {
   const [fhevmDelayPassed, setFhevmDelayPassed] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   React.useEffect(() => {
     const timer = setTimeout(() => setFhevmDelayPassed(true), 1000);
     return () => clearTimeout(timer);
