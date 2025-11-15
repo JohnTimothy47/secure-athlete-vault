@@ -7,6 +7,17 @@ A privacy-preserving athlete registration system built with Fully Homomorphic En
 
 ## Quick Start
 
+## Features
+
+- **Privacy-Preserving Athlete Registration**: All athlete data is encrypted using FHE
+- **Homomorphic Age Validation**: Compute age requirements without decrypting athlete data
+- **Anonymous Athlete Participation**: Users can view encrypted athlete statistics
+- **End-to-End Encryption**: Athlete data remains encrypted throughout the process
+- **Rainbow Wallet Integration**: Easy wallet connection for athlete registration
+- **Access Control**: Role-based permissions for administrative athlete operations
+- **Emergency Stop**: Authorized operators can pause athlete registration
+- **Input Validation**: Comprehensive validation for athlete registration data
+
 For detailed instructions see:
 [FHEVM Hardhat Quick Start Tutorial](https://docs.zama.ai/protocol/solidity-guides/getting-started/quick-start-tutorial)
 
