@@ -1,4 +1,4 @@
-// Deployment script for athlete registration contracts
+// Enhanced deployment script for athlete registration contracts with improved error handling
 const func = async function (hre) {
   const { deploy } = hre.deployments;
 

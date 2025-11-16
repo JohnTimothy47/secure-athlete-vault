@@ -18,6 +18,28 @@ A privacy-preserving athlete registration system built with Fully Homomorphic En
 - **Emergency Stop**: Authorized operators can pause athlete registration
 - **Input Validation**: Comprehensive validation for athlete registration data
 
+## Deployment Guide
+
+### Local Development
+```bash
+npm run node        # Start local Hardhat network
+npm run deploy:localhost  # Deploy contracts to localhost
+cd frontend && npm run dev  # Start frontend development server
+```
+
+### Sepolia Testnet
+```bash
+npm run deploy:sepolia    # Deploy to Sepolia testnet
+npm run verify:sepolia    # Verify contracts on Etherscan
+```
+
+## Security Features
+
+- **FHE Encryption**: All athlete data is homomorphically encrypted
+- **Access Control**: Role-based permissions for administrative operations
+- **Input Validation**: Comprehensive validation of athlete registration data
+- **Emergency Stop**: Authorized operators can pause athlete registration
+
 For detailed instructions see:
 [FHEVM Hardhat Quick Start Tutorial](https://docs.zama.ai/protocol/solidity-guides/getting-started/quick-start-tutorial)
 
