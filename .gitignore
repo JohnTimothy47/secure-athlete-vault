@@ -38,8 +38,6 @@ deployment-info.json
 *.sw?
 
 # Private keys and sensitive data
-*.js
-*.ts
 *.pem
 *.key
 private-keys/
@@ -47,3 +45,9 @@ secrets/
 
 # Allow deploy scripts
 !deploy/
+
+# Allow frontend TypeScript files
+!frontend/**/*.ts
+!frontend/**/*.tsx
+!frontend/**/*.js
+!frontend/**/*.jsx
