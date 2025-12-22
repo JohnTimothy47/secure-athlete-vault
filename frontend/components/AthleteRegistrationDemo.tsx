@@ -1,6 +1,5 @@
 "use client";
 
-// Athlete registration demo component with FHE encryption
 import React, { useState, useRef } from "react";
 import { useFhevm } from "../fhevm/useFhevm";
 import { useInMemoryStorage } from "../hooks/useInMemoryStorage";
@@ -8,35 +7,32 @@ import { useAthleteRegistration, SportCategory } from "@/hooks/useAthleteRegistr
 import { useAccount, useChainId } from 'wagmi';
 import { ethers } from 'ethers';
 
+const SPORT_CATEGORIES = [
+  { id: SportCategory.Individual, name: "Individual", icon: "🏃‍♂️", minAge: 8, color: "from-blue-500 to-cyan-500", bgColor: "bg-blue-500/10", borderColor: "border-blue-500/30" },
+  { id: SportCategory.Team, name: "Team", icon: "⚽", minAge: 10, color: "from-green-500 to-emerald-500", bgColor: "bg-green-500/10", borderColor: "border-green-500/30" },
+  { id: SportCategory.Endurance, name: "Endurance", icon: "🏊‍♂️", minAge: 12, color: "from-yellow-500 to-orange-500", bgColor: "bg-yellow-500/10", borderColor: "border-yellow-500/30" },
+  { id: SportCategory.Combat, name: "Combat", icon: "🥊", minAge: 14, color: "from-red-500 to-pink-500", bgColor: "bg-red-500/10", borderColor: "border-red-500/30" },
+  { id: SportCategory.Other, name: "Other", icon: "🎯", minAge: 8, color: "from-purple-500 to-violet-500", bgColor: "bg-purple-500/10", borderColor: "border-purple-500/30" },
+];
+
 export const AthleteRegistrationDemo = () => {
   const { storage: fhevmDecryptionSignatureStorage } = useInMemoryStorage();
   const storageRef = useRef(fhevmDecryptionSignatureStorage);
 
-  // Use wagmi hooks directly
   const wagmiAccount = useAccount();
   const wagmiChainId = useChainId();
 
-  // Add mounted state to prevent hydration mismatch
   const [mounted, setMounted] = useState(false);
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Simplified connection check - use wagmi connection status directly, but only after mounted
   const isConnected = mounted ? wagmiAccount.isConnected : false;
   const chainId = wagmiChainId;
-  const isLocalNetwork = chainId === 31337;
 
-  // Create ethers objects from wagmi
   const [ethersSigner, setEthersSigner] = useState<ethers.Signer | undefined>(undefined);
   const [ethersReadonlyProvider, setEthersReadonlyProvider] = useState<ethers.ContractRunner | undefined>(undefined);
 
-  // Only access window on client side
-  React.useEffect(() => {
-    console.log('window.ethereum:', !!window?.ethereum);
-  }, []);
-
-  // Initialize ethers objects when wagmi account is ready (client-side only)
   React.useEffect(() => {
     if (wagmiAccount.isConnected && typeof window !== 'undefined' && window.ethereum && wagmiAccount.address) {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -45,20 +41,12 @@ export const AthleteRegistrationDemo = () => {
         setEthersSigner(signer);
       });
     } else {
-      // Reset when disconnected
       setEthersReadonlyProvider(undefined);
       setEthersSigner(undefined);
     }
   }, [wagmiAccount.isConnected, wagmiAccount.address]);
 
-  const initialMockChains = {};
-
-  // Enable FHEVM only when user is connected and ready to use it
-  // Add a small delay to avoid immediate network requests on page load
   const [fhevmDelayPassed, setFhevmDelayPassed] = useState(false);
-  const [registrationError, setRegistrationError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   React.useEffect(() => {
     const timer = setTimeout(() => setFhevmDelayPassed(true), 1000);
     return () => clearTimeout(timer);
@@ -69,12 +57,11 @@ export const AthleteRegistrationDemo = () => {
   const {
     instance: fhevmInstance,
     status: fhevmStatus,
-    error: fhevmError,
   } = useFhevm({
     provider: fhevmEnabled ? window.ethereum : undefined,
     chainId,
-    initialMockChains,
-    enabled: fhevmEnabled, // Only enable when connected and after delay
+    initialMockChains: {},
+    enabled: fhevmEnabled,
   });
 
   const athleteRegistration = useAthleteRegistration({
@@ -84,39 +71,8 @@ export const AthleteRegistrationDemo = () => {
     chainId,
     ethersSigner,
     ethersReadonlyProvider,
-    sameChain: { current: () => true }, // Simplified
-    sameSigner: { current: () => true }, // Simplified
-  });
-
-  // Debug: Log current network info (after all variables are declared)
-  console.log('wagmi hooks:', { chainId: wagmiChainId, isConnected: wagmiAccount.isConnected, address: wagmiAccount.address });
-  console.log('component state:', {
-    isConnected,
-    isLocalNetwork,
-    ethersSigner: !!ethersSigner,
-    ethersReadonlyProvider: !!ethersReadonlyProvider,
-    fhevmInstance: !!fhevmInstance,
-    canRegister: athleteRegistration?.canRegister,
-    canDecrypt: athleteRegistration?.canDecrypt,
-    isRegistered: athleteRegistration?.isRegistered
-  });
-  console.log('ethersSigner details:', ethersSigner);
-
-  // Debug FHEVM instance status
-  console.log('FHEVM instance details:', {
-    instance: !!fhevmInstance,
-    status: fhevmStatus,
-    error: fhevmError?.message,
-    enabled: fhevmEnabled,
-    conditions: { isConnected, mounted, fhevmDelayPassed, hasEthereum: typeof window !== 'undefined' && !!window.ethereum }
-  });
-  console.log('Registration capabilities:', {
-    canRegister: athleteRegistration.canRegister,
-    canDecrypt: athleteRegistration.canDecrypt,
-    fhevmReady: !!fhevmInstance,
-    isConnected,
-    isRegistered: athleteRegistration.isRegistered,
-    message: athleteRegistration.message
+    sameChain: { current: () => true },
+    sameSigner: { current: () => true },
   });
 
   const [formData, setFormData] = useState({
@@ -127,10 +83,7 @@ export const AthleteRegistrationDemo = () => {
   });
 
   const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleRegister = async () => {
@@ -138,274 +91,386 @@ export const AthleteRegistrationDemo = () => {
       alert("Please fill in all fields");
       return;
     }
-
-    // Validate that age and contact are valid numbers
     const age = parseInt(formData.age);
     const contact = parseInt(formData.contact);
-
     if (isNaN(age) || isNaN(contact)) {
       alert("Please enter valid numbers for age and contact");
       return;
     }
-
-    // Name can be any string (English, etc.)
     await athleteRegistration.registerAthlete(formData.name, age, contact, formData.sportCategory);
   };
 
-  const getCategoryName = (category: SportCategory) => {
-    switch (category) {
-      case SportCategory.Individual: return "Individual Sports";
-      case SportCategory.Team: return "Team Sports";
-      case SportCategory.Endurance: return "Endurance Sports";
-      case SportCategory.Combat: return "Combat Sports";
-      case SportCategory.Other: return "Other Sports";
-      default: return "Unknown";
-    }
-  };
+  const selectedCategory = SPORT_CATEGORIES.find(c => c.id === formData.sportCategory);
 
-  const getMinAge = (category: SportCategory) => {
-    switch (category) {
-      case SportCategory.Individual: return 8;
-      case SportCategory.Team: return 10;
-      case SportCategory.Endurance: return 12;
-      case SportCategory.Combat: return 14;
-      case SportCategory.Other: return 8;
-      default: return 8;
-    }
-  };
-
-
-  // Always render the main content, but show different sections based on state
   return (
-    <main className="max-w-6xl mx-auto px-6 py-8">
+    <main className="max-w-7xl mx-auto px-6 py-8">
       <div className="animate-fade-in">
-        {/* Connection Status */}
+        {/* Connection Required */}
         {!isConnected && (
-          <div className="mb-8">
-            <div className="card max-w-md mx-auto text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center text-2xl font-bold text-white mx-auto mb-6 shadow-lg">
+          <div className="mb-8 animate-scale-in">
+            <div className="card max-w-lg mx-auto text-center py-12">
+              <div className="w-24 h-24 bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600 rounded-3xl flex items-center justify-center text-5xl mx-auto mb-8 shadow-2xl shadow-purple-500/30 animate-float">
                 🏃‍♂️
               </div>
-              <h2 className="text-2xl font-bold text-slate-100 mb-4">Connect Wallet</h2>
-              <p className="text-slate-400 mb-6">Please connect your wallet to start athlete registration</p>
-              <p className="text-slate-300 text-sm">Use the wallet connection button in the top navigation bar</p>
+              <h2 className="text-3xl font-bold text-white mb-4">
+                👋 Welcome, Athlete!
+              </h2>
+              <p className="text-white/60 mb-8 text-lg">
+                Connect your wallet to start your privacy-protected registration journey
+              </p>
+              <div className="flex items-center justify-center gap-3 text-white/40 text-sm">
+                <span>🔒 Secure</span>
+                <span>•</span>
+                <span>🔐 Encrypted</span>
+                <span>•</span>
+                <span>🛡️ Private</span>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Main Registration Section */}
+        {/* Main Content */}
         {isConnected && (
           <div className="grid lg:grid-cols-2 gap-8">
-          {/* Registration Form */}
-          <div className="card">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
-                📝
+            {/* Registration Form */}
+            <div className="card animate-slide-up">
+              <div className="section-header">
+                <div className="icon bg-gradient-to-br from-blue-500 to-purple-600">
+                  📝
+                </div>
+                <div>
+                  <h2 className="title">Athlete Registration</h2>
+                  <p className="subtitle">Fill in your details securely</p>
+                </div>
               </div>
-                  <h2 className="text-2xl font-bold text-slate-100">Athlete Registration</h2>
+
+              {athleteRegistration.isRegistered ? (
+                <div className="text-center py-12 animate-scale-in">
+                  <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30 animate-glow">
+                    <span className="text-4xl">✅</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-white mb-3">
+                    🎉 Registration Complete!
+                  </h3>
+                  <p className="text-white/60 mb-6">
+                    Your athlete information has been securely encrypted and stored on-chain.
+                  </p>
+                  <div className="badge badge-success">
+                    <span>🔐</span> FHE Protected
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }} className="space-y-6">
+                  {/* Name Input */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span className="form-label-icon">👤</span>
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Enter your full name"
+                      value={formData.name}
+                      onChange={(e) => handleInputChange("name", e.target.value)}
+                    />
+                  </div>
+
+                  {/* Age Input */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span className="form-label-icon">🎂</span>
+                      Age
+                    </label>
+                    <input
+                      type="number"
+                      className="input-field"
+                      placeholder="Enter your age"
+                      value={formData.age}
+                      onChange={(e) => handleInputChange("age", e.target.value)}
+                      min="1"
+                      max="120"
+                    />
+                  </div>
+
+                  {/* Contact Input */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span className="form-label-icon">📱</span>
+                      Contact Number
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="Enter contact number"
+                      value={formData.contact}
+                      onChange={(e) => handleInputChange("contact", e.target.value)}
+                    />
+                  </div>
+
+                  {/* Sport Category Selector */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      <span className="form-label-icon">🏆</span>
+                      Sport Category
+                    </label>
+                    <div className="sport-category-grid">
+                      {SPORT_CATEGORIES.map((category) => (
+                        <div
+                          key={category.id}
+                          className={`sport-category-card ${formData.sportCategory === category.id ? 'selected' : ''}`}
+                          onClick={() => handleInputChange("sportCategory", category.id)}
+                        >
+                          <span className="icon">{category.icon}</span>
+                          <span className="name">{category.name}</span>
+                          <span className="min-age">Min: {category.minAge}+</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    className={`btn-primary w-full ${athleteRegistration.isRegistering ? 'opacity-80' : ''}`}
+                    disabled={!athleteRegistration.canRegister}
+                  >
+                    {athleteRegistration.isRegistering ? (
+                      <>
+                        <div className="spinner"></div>
+                        <span>🔐 Encrypting & Registering...</span>
+                      </>
+                    ) : athleteRegistration.canRegister ? (
+                      <>
+                        <span>🚀</span>
+                        <span>Register Athlete</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>⏳</span>
+                        <span>Preparing...</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* FHEVM Status */}
+                  <div className="text-center text-sm text-white/40 mt-4">
+                    {fhevmStatus === 'ready' ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                        FHE Encryption Ready
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="spinner w-3 h-3"></div>
+                        Initializing FHE...
+                      </span>
+                    )}
+                  </div>
+                </form>
+              )}
             </div>
 
-            {athleteRegistration.isRegistered ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">✅</span>
-                </div>
-                <h3 className="text-xl font-semibold text-slate-100 mb-2">Registration Successful!</h3>
-                <p className="text-slate-400">Your athlete information has been securely encrypted and stored.</p>
-              </div>
-            ) : (
-              <form onSubmit={(e) => { e.preventDefault(); handleRegister(); }} className="space-y-6">
-                <div className="form-group">
-                  <label className="form-label text-slate-100">Name</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="Enter your name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label text-slate-100">Age</label>
-                  <input
-                    type="number"
-                    className="input-field"
-                    placeholder="Enter your age"
-                    value={formData.age}
-                    onChange={(e) => handleInputChange("age", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label text-slate-100">Contact Info (as number)</label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    placeholder="Enter contact info (as number)"
-                    value={formData.contact}
-                    onChange={(e) => handleInputChange("contact", e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label text-slate-100">Sport Category</label>
-                  <select
-                    className="input-field"
-                    value={formData.sportCategory}
-                    onChange={(e) => handleInputChange("sportCategory", parseInt(e.target.value))}
-                  >
-                    <option value={SportCategory.Individual}>
-                      🏃‍♂️ Individual Sports (Min age: 8)
-                    </option>
-                    <option value={SportCategory.Team}>
-                      ⚽ Team Sports (Min age: 10)
-                    </option>
-                    <option value={SportCategory.Endurance}>
-                      🏊‍♂️ Endurance Sports (Min age: 12)
-                    </option>
-                    <option value={SportCategory.Combat}>
-                      🥊 Combat Sports (Min age: 14)
-                    </option>
-                    <option value={SportCategory.Other}>
-                      🎯 Other Sports (Min age: 8)
-                    </option>
-                  </select>
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn-primary w-full"
-                  disabled={!athleteRegistration.canRegister}
-                >
-                  {athleteRegistration.canRegister
-                    ? "🚀 Register Athlete"
-                    : athleteRegistration.isRegistering
-                      ? "⏳ Registering..."
-                      : "❌ Cannot Register"}
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* Athlete Information Display */}
-          <div className="space-y-6">
-            {athleteRegistration.isRegistered && athleteRegistration.athleteInfo && (
-              <div className="card">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-600 rounded-lg flex items-center justify-center text-white font-bold">
-                    🔒
+            {/* Right Column - Info & Actions */}
+            <div className="space-y-6">
+              {/* Encrypted Information */}
+              {athleteRegistration.isRegistered && athleteRegistration.athleteInfo && (
+                <div className="card animate-slide-up stagger-1">
+                  <div className="section-header">
+                    <div className="icon bg-gradient-to-br from-green-500 to-teal-600">
+                      🔒
+                    </div>
+                    <div>
+                      <h2 className="title">Encrypted Data</h2>
+                      <p className="subtitle">Stored securely on-chain</p>
+                    </div>
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-100">Encrypted Information</h2>
-                </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
-                    <span className="font-medium text-slate-200">Sport Category</span>
-                    <span className="text-slate-100">{getCategoryName(athleteRegistration.athleteInfo.sportCategory)}</span>
+                  <div className="space-y-3">
+                    <div className="data-row">
+                      <span className="label">
+                        <span>🏆</span> Sport Category
+                      </span>
+                      <span className="value">
+                        {selectedCategory?.icon} {selectedCategory?.name}
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">
+                        <span>📅</span> Registered
+                      </span>
+                      <span className="value text-sm">
+                        {new Date(Number(athleteRegistration.athleteInfo.registrationTimestamp) * 1000).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">
+                        <span>👤</span> Name
+                      </span>
+                      <span className="value encrypted">••••••••</span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">
+                        <span>🎂</span> Age
+                      </span>
+                      <span className="value encrypted">••</span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">
+                        <span>📱</span> Contact
+                      </span>
+                      <span className="value encrypted">••••••••••</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-slate-800 rounded-lg">
-                    <span className="font-medium text-slate-200">Registration Time</span>
-                    <span className="text-slate-100 text-sm">
-                      {new Date(Number(athleteRegistration.athleteInfo.registrationTimestamp) * 1000).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Show decrypt button on all networks */}
-                <div className="mt-6">
+                  <div className="divider"></div>
+
                   <button
-                    className="btn-primary w-full"
+                    className={`btn-primary btn-success w-full ${athleteRegistration.isDecrypting ? 'opacity-80' : ''}`}
                     disabled={!athleteRegistration.canDecrypt}
                     onClick={athleteRegistration.decryptAthleteInfo}
                   >
-                    {athleteRegistration.canDecrypt
-                      ? "🔓 Decrypt Info"
-                      : athleteRegistration.isDecrypting
-                        ? "⏳ Decrypting..."
-                        : "❌ No Info to Decrypt"}
+                    {athleteRegistration.isDecrypting ? (
+                      <>
+                        <div className="spinner"></div>
+                        <span>🔓 Decrypting...</span>
+                      </>
+                    ) : athleteRegistration.canDecrypt ? (
+                      <>
+                        <span>🔓</span>
+                        <span>Decrypt My Information</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>⏳</span>
+                        <span>Preparing Decryption...</span>
+                      </>
+                    )}
                   </button>
 
-                  {/* Show network info */}
-                  <p className="text-center text-sm text-slate-400 mt-2">
-                    🔐 Real FHE encryption and decryption on all networks
+                  <p className="text-center text-xs text-white/40 mt-3">
+                    🔐 Only you can decrypt your private data
                   </p>
                 </div>
-              </div>
-            )}
+              )}
 
-            {athleteRegistration.clearAthleteInfo && (
-              <div className="card border-2 border-green-200">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">
-                    ✅
+              {/* Decrypted Information */}
+              {athleteRegistration.clearAthleteInfo && (
+                <div className="card card-success animate-scale-in">
+                  <div className="section-header">
+                    <div className="icon bg-gradient-to-br from-green-500 to-emerald-600">
+                      ✅
+                    </div>
+                    <div>
+                      <h2 className="title">Decrypted Data</h2>
+                      <p className="subtitle">Your private information</p>
+                    </div>
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-100">Decrypted Information (Private)</h2>
+
+                  <div className="space-y-3">
+                    <div className="data-row">
+                      <span className="label">
+                        <span>👤</span> Name
+                      </span>
+                      <span className="value decrypted">
+                        {athleteRegistration.clearAthleteInfo.name.toString()}
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">
+                        <span>🎂</span> Age
+                      </span>
+                      <span className="value decrypted">
+                        {athleteRegistration.clearAthleteInfo.age.toString()} years
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">
+                        <span>📱</span> Contact
+                      </span>
+                      <span className="value decrypted">
+                        {athleteRegistration.clearAthleteInfo.contact.toString()}
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="label">
+                        <span>🏆</span> Category Min Age
+                      </span>
+                      <span className="value">
+                        {selectedCategory?.minAge}+ years
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🎉</span>
+                      <div>
+                        <p className="font-semibold text-green-400">Decryption Successful!</p>
+                        <p className="text-sm text-white/60">Your data has been securely decrypted</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="flex justify-between items-center p-4 bg-slate-800 rounded-lg border border-slate-600">
-                    <span className="font-medium text-slate-200">Name</span>
-                    <span className="text-slate-100 font-mono">{athleteRegistration.clearAthleteInfo.name.toString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 bg-slate-800 rounded-lg border border-slate-600">
-                    <span className="font-medium text-slate-200">Age</span>
-                    <span className="text-slate-100 font-mono">{athleteRegistration.clearAthleteInfo.age.toString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 bg-slate-800 rounded-lg border border-slate-600">
-                    <span className="font-medium text-slate-200">Contact Info</span>
-                    <span className="text-slate-100 font-mono">{athleteRegistration.clearAthleteInfo.contact.toString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-4 bg-slate-800 rounded-lg border border-slate-600">
-                    <span className="font-medium text-slate-200">Minimum Category Age</span>
-                    <span className="text-slate-100">{getMinAge(athleteRegistration.clearAthleteInfo.sportCategory)} years</span>
-                  </div>
+              {/* Action Buttons */}
+              <div className="card animate-slide-up stagger-2">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <span>⚡</span> Quick Actions
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    className="btn-secondary"
+                    disabled={!athleteRegistration.canRefresh}
+                    onClick={athleteRegistration.refreshAthleteInfo}
+                  >
+                    <span>🔄</span> Refresh
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    disabled={!athleteRegistration.canCheckAge}
+                    onClick={athleteRegistration.checkAgeRequirement}
+                  >
+                    <span>📊</span> Check Age
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="card">
-              <h3 className="text-lg font-semibold text-slate-100 mb-4">Actions</h3>
-              <div className="grid grid-cols-1 gap-3">
-                <button
-                  className="btn-primary"
-                  disabled={!athleteRegistration.canRefresh}
-                  onClick={athleteRegistration.refreshAthleteInfo}
-                >
-                  🔄 Refresh Info
-                </button>
-                <button
-                  className="btn-primary"
-                  disabled={!athleteRegistration.canCheckAge}
-                  onClick={athleteRegistration.checkAgeRequirement}
-                >
-                  📊 Check Age Requirements
-                </button>
-              </div>
-            </div>
-
-            {/* Status Messages */}
-            {(athleteRegistration.message || athleteRegistration.error) && (
-              <div className={`message ${athleteRegistration.error ? 'error' : 'success'}`}>
-                <div className="flex items-center gap-2">
-                  {athleteRegistration.error ? '❌' : '✅'}
-                  <span className="font-medium">
+              {/* Status Messages */}
+              {(athleteRegistration.message || athleteRegistration.error) && (
+                <div className={`message ${athleteRegistration.error ? 'error' : 'success'} animate-slide-in`}>
+                  <span className="text-xl">
+                    {athleteRegistration.error ? '❌' : '✅'}
+                  </span>
+                  <span>
                     {athleteRegistration.message || athleteRegistration.error?.message}
                   </span>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Footer */}
-        <footer className="mt-16 text-center">
-          <div className="glass-dark rounded-xl p-6 max-w-4xl mx-auto">
-            <p className="text-slate-400">
-              © 2024 Athlete Registration System. Privacy protection using FHE technology.
+        <footer className="mt-20 text-center animate-fade-in">
+          <div className="glass-dark rounded-2xl p-8 max-w-4xl mx-auto">
+            <div className="flex items-center justify-center gap-6 mb-6">
+              <span className="text-3xl">🏃‍♂️</span>
+              <span className="text-3xl">🔐</span>
+              <span className="text-3xl">⛓️</span>
+              <span className="text-3xl">🛡️</span>
+            </div>
+            <p className="text-white/60 mb-4">
+              Built with ❤️ using Zama FHE Technology
             </p>
+            <div className="flex items-center justify-center gap-4 text-sm text-white/40">
+              <span>🔒 End-to-End Encrypted</span>
+              <span>•</span>
+              <span>🌐 Decentralized</span>
+              <span>•</span>
+              <span>🛡️ Privacy First</span>
+            </div>
           </div>
         </footer>
       </div>

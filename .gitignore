@@ -44,3 +44,6 @@ deployment-info.json
 *.key
 private-keys/
 secrets/
+
+# Allow deploy scripts
+!deploy/

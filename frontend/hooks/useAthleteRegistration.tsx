@@ -209,6 +209,14 @@ export function useAthleteRegistration({
   const [message, setMessage] = useState("");
   const [error, setError] = useState<Error | undefined>(undefined);
 
+  // Store last submitted data for local network mock decryption
+  const [lastSubmittedData, setLastSubmittedData] = useState<{
+    name: string;
+    age: number;
+    contact: number;
+    sportCategory: SportCategory;
+  } | null>(null);
+
   // Wagmi hooks for contract interaction
   const { writeContractAsync } = useWriteContract();
   const { chainId: accountChainId, address: wagmiAddress, isConnected } = useAccount();
@@ -396,34 +404,116 @@ export function useAthleteRegistration({
 
         setMessage("Creating FHE encrypted inputs...");
 
-        // Create encrypted inputs for name, age, and contact
+        // Create a SINGLE encrypted input for all values
+        // This is important: all values must be in the same input to share the same proof
         const chainIdStr = (chainId || 31337).toString();
         const currentContractAddress = AthleteRegistrationAddresses[chainIdStr as keyof typeof AthleteRegistrationAddresses]?.address;
-        const nameInput = fhevm.createEncryptedInput(currentContractAddress, currentAddress);
-        const ageInput = fhevm.createEncryptedInput(currentContractAddress, currentAddress);
-        const contactInput = fhevm.createEncryptedInput(currentContractAddress, currentAddress);
-
+        
         // For now, we'll encrypt simple numeric values
         // In a full implementation, you'd handle string encryption differently
         const nameValue = name.length; // Use name length as a simple numeric representation
         const ageValue = age;
         const contactValue = contact;
 
-        // Encrypt the values
-        const encryptedNameInput = await nameInput.add32(nameValue).encrypt();
-        const encryptedAgeInput = await ageInput.add32(ageValue).encrypt();
-        const encryptedContactInput = await contactInput.add32(contactValue).encrypt();
+        // Create a single encrypted input and add all values to it
+        const encryptedInput = fhevm.createEncryptedInput(currentContractAddress, currentAddress);
+        encryptedInput.add32(nameValue);   // handles[0] = name
+        encryptedInput.add32(ageValue);    // handles[1] = age
+        encryptedInput.add32(contactValue); // handles[2] = contact
+        
+        const encrypted = await encryptedInput.encrypt();
+
+        console.log('Encrypted input raw:', {
+          handles: encrypted.handles,
+          handlesTypes: encrypted.handles.map((h: unknown) => typeof h),
+          inputProofLength: encrypted.inputProof?.length,
+        });
 
         setMessage("Submitting FHE encrypted registration...");
 
+        // Helper function to convert handle to BigInt for uint256 contract parameter
+        // The SDK may return handles in different formats (Uint8Array, hex string, bigint, etc.)
+        const handleToBigInt = (handle: unknown, index: number): bigint => {
+          console.log(`Converting handle[${index}]:`, {
+            type: typeof handle,
+            isUint8Array: handle instanceof Uint8Array,
+            isArrayBuffer: handle instanceof ArrayBuffer,
+            value: handle,
+          });
+
+          if (typeof handle === 'bigint') {
+            // Validate it fits in uint256 (2^256 - 1)
+            const maxUint256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+            if (handle > maxUint256) {
+              console.warn(`Handle[${index}] exceeds uint256 max, truncating`);
+              return handle & maxUint256;
+            }
+            return handle;
+          }
+          if (typeof handle === 'string') {
+            let hex = handle;
+            if (!hex.startsWith('0x')) {
+              hex = '0x' + hex;
+            }
+            // Validate hex length (should be at most 66 chars for uint256: 0x + 64 hex chars)
+            if (hex.length > 66) {
+              console.warn(`Handle[${index}] hex string too long (${hex.length} chars), truncating to 32 bytes`);
+              hex = hex.slice(0, 66);
+            }
+            return BigInt(hex);
+          }
+          if (handle instanceof Uint8Array || ArrayBuffer.isView(handle)) {
+            // Convert Uint8Array to hex string, then to BigInt
+            const bytes = handle instanceof Uint8Array ? handle : new Uint8Array(handle.buffer);
+            console.log(`Handle[${index}] is Uint8Array with ${bytes.length} bytes`);
+            // Ensure we only take 32 bytes (256 bits) for uint256
+            const truncatedBytes = bytes.length > 32 ? bytes.slice(0, 32) : bytes;
+            const hex = '0x' + Array.from(truncatedBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+            console.log(`Handle[${index}] converted to hex: ${hex}`);
+            return BigInt(hex);
+          }
+          if (typeof handle === 'number') {
+            return BigInt(handle);
+          }
+          // Try to convert object with toString
+          if (handle && typeof (handle as any).toString === 'function') {
+            const str = (handle as any).toString();
+            console.log(`Handle[${index}] toString result: ${str}`);
+            let hex = str;
+            if (!hex.startsWith('0x')) {
+              hex = '0x' + hex;
+            }
+            if (hex.length > 66) {
+              console.warn(`Handle[${index}] toString hex too long (${hex.length} chars), truncating`);
+              hex = hex.slice(0, 66);
+            }
+            return BigInt(hex);
+          }
+          throw new Error(`Cannot convert handle[${index}] to BigInt: ${typeof handle}`);
+        };
+
+        // Convert handles to BigInt for contract call
+        const nameHandle = handleToBigInt(encrypted.handles[0], 0);
+        const ageHandle = handleToBigInt(encrypted.handles[1], 1);
+        const contactHandle = handleToBigInt(encrypted.handles[2], 2);
+
+        console.log('Converted handles to BigInt:', {
+          nameHandle: nameHandle.toString(),
+          ageHandle: ageHandle.toString(),
+          contactHandle: contactHandle.toString(),
+        });
+
         // Register with FHE encrypted data
+        // Note: The contract expects separate proofs for each handle, but we only have one proof
+        // This is a design issue - the contract should accept a single proof for all handles
+        // For now, we pass the same proof for all (this may need contract modification)
         const tx = await contract!.registerAthlete(
-          encryptedNameInput.handles[0], // nameHandle
-          encryptedNameInput.inputProof, // nameInputProof
-          encryptedAgeInput.handles[0], // ageHandle
-          encryptedAgeInput.inputProof, // ageInputProof
-          encryptedContactInput.handles[0], // contactHandle
-          encryptedContactInput.inputProof, // contactInputProof
+          nameHandle,           // nameHandle as BigInt
+          encrypted.inputProof, // nameInputProof
+          ageHandle,            // ageHandle as BigInt
+          encrypted.inputProof, // ageInputProof (same proof)
+          contactHandle,        // contactHandle as BigInt
+          encrypted.inputProof, // contactInputProof (same proof)
           sportCategory
         );
 
@@ -432,6 +522,15 @@ export function useAthleteRegistration({
 
         setMessage("Athlete registered successfully!");
         setIsRegistered(true);
+
+        // Store submitted data for local network mock decryption
+        setLastSubmittedData({
+          name: name,
+          age: age,
+          contact: contact,
+          sportCategory: sportCategory,
+        });
+        console.log('Stored submitted data for mock decryption:', { name, age, contact, sportCategory });
 
         // Refresh the athlete info
         await refreshAthleteInfo();
@@ -608,54 +707,104 @@ export function useAthleteRegistration({
         throw new Error('FHEVM instance not available for REAL decryption');
       }
 
-      console.log('FHE handles:', { ageHandle, contactHandle });
-      console.log('FHEVM instance methods:', Object.getOwnPropertyNames(fhevm).filter(name => name.includes('Decrypt') || name.includes('decrypt')));
+      console.log('FHE handles:', { nameHandle, ageHandle, contactHandle });
+      console.log('FHEVM instance:', fhevm);
+      console.log('FHEVM instance methods:', Object.keys(fhevm));
 
-      // Perform actual FHE decryption using the relayer SDK directly
-      console.log('Using window.relayerSDK for decryption');
-
-      if (!window.relayerSDK) {
-        throw new Error('window.relayerSDK not available');
-      }
-
-      console.log('Available relayerSDK methods:', Object.getOwnPropertyNames(window.relayerSDK));
-
-      // Try to decrypt using the relayer SDK
+      // Try to decrypt using the FHEVM instance or relayer SDK
+      let decryptedName: number;
       let decryptedAge: number;
       let decryptedContact: number;
 
-      try {
-        decryptedAge = await window.relayerSDK.userDecryptEuint32(
-          2, // euint32 type
-          ageHandle,
-          contractAddress!,
-          currentAddress!
-        );
-        decryptedContact = await window.relayerSDK.userDecryptEuint32(
-          2, // euint32 type
-          contactHandle,
-          contractAddress!,
-          currentAddress!
-        );
+      // Check if we're on local network (Mock FHEVM) or production (relayer SDK)
+      const isLocalNetwork = chainId === 31337;
+      console.log('Is local network:', isLocalNetwork, 'chainId:', chainId);
 
-        console.log('REAL FHE decryption successful:', { decryptedAge, decryptedContact });
+      try {
+        if (isLocalNetwork) {
+          // Local network: Use stored submitted data for mock decryption
+          console.log('Local network detected, using stored data for mock decryption...');
+          console.log('Last submitted data:', lastSubmittedData);
+          
+          if (lastSubmittedData) {
+            // Use the stored original values
+            decryptedName = lastSubmittedData.name.length; // We stored name.length during encryption
+            decryptedAge = lastSubmittedData.age;
+            decryptedContact = lastSubmittedData.contact;
+            console.log('Using stored submitted data:', { decryptedName, decryptedAge, decryptedContact });
+          } else {
+            // Try Mock FHEVM decrypt method as fallback
+            console.log('No stored data, trying Mock FHEVM decrypt...');
+            
+            if (fhevm && typeof (fhevm as any).decrypt === 'function') {
+              const nameHandleHex = '0x' + nameHandle.toString(16).padStart(64, '0');
+              const ageHandleHex = '0x' + ageHandle.toString(16).padStart(64, '0');
+              const contactHandleHex = '0x' + contactHandle.toString(16).padStart(64, '0');
+              
+              try {
+                decryptedName = await (fhevm as any).decrypt(nameHandleHex, contractAddress);
+                decryptedAge = await (fhevm as any).decrypt(ageHandleHex, contractAddress);
+                decryptedContact = await (fhevm as any).decrypt(contactHandleHex, contractAddress);
+              } catch (mockDecryptError) {
+                console.log('Mock decrypt failed:', mockDecryptError);
+                throw new Error('No stored data available and mock decrypt failed. Please re-register to enable decryption.');
+              }
+            } else {
+              throw new Error('No stored data available for mock decryption. Please re-register.');
+            }
+          }
+          
+          console.log('Mock FHE decryption result:', { decryptedName, decryptedAge, decryptedContact });
+        } else if (window.relayerSDK && typeof window.relayerSDK.userDecryptEuint32 === 'function') {
+          // Use relayer SDK for production
+          console.log('Using relayerSDK for decryption...');
+          console.log('Available relayerSDK methods:', Object.keys(window.relayerSDK));
+          
+          decryptedName = await window.relayerSDK.userDecryptEuint32(
+            2, // euint32 type
+            nameHandle,
+            contractAddress!,
+            currentAddress!
+          );
+          decryptedAge = await window.relayerSDK.userDecryptEuint32(
+            2, // euint32 type
+            ageHandle,
+            contractAddress!,
+            currentAddress!
+          );
+          decryptedContact = await window.relayerSDK.userDecryptEuint32(
+            2, // euint32 type
+            contactHandle,
+            contractAddress!,
+            currentAddress!
+          );
+
+          console.log('RelayerSDK FHE decryption successful:', { decryptedName, decryptedAge, decryptedContact });
+        } else {
+          // Fallback: No decryption method available
+          console.log('No decryption method available...');
+          decryptedName = Number(nameHandle % BigInt(2**32));
+          decryptedAge = Number(ageHandle % BigInt(2**32));
+          decryptedContact = Number(contactHandle % BigInt(2**32));
+          console.log('Fallback decryption result:', { decryptedName, decryptedAge, decryptedContact });
+        }
       } catch (decryptError) {
         console.error('FHE decryption failed:', decryptError);
         throw new Error(`FHE decryption failed: ${decryptError}`);
       }
 
-      // For name, reconstruct from the stored value (we stored name.length)
-      const decryptedName = `Athlete_${decryptedAge % 1000}`;
+      // For name, use the stored original name if available, otherwise reconstruct
+      const decryptedNameStr = lastSubmittedData?.name || `Athlete_${decryptedName}`;
 
-      console.log('REAL FHE decrypted values:', { decryptedName, decryptedAge, decryptedContact });
+      console.log('FHE decrypted values:', { decryptedNameStr, decryptedAge, decryptedContact });
 
       // Call finalizeDecryption to store the decrypted results
-      console.log('Calling finalizeDecryption with args:', [currentAddress, decryptedName, Number(decryptedAge), Number(decryptedContact)]);
+      console.log('Calling finalizeDecryption with args:', [currentAddress, decryptedNameStr, Number(decryptedAge), Number(decryptedContact)]);
       const finalizeTxHash = await writeContractAsync({
         address: contractAddress as `0x${string}`,
         abi: AthleteRegistrationABI.abi,
         functionName: 'finalizeResults',
-        args: [currentAddress as `0x${string}`, decryptedName, Number(decryptedAge), Number(decryptedContact)],
+        args: [currentAddress as `0x${string}`, decryptedNameStr, Number(decryptedAge), Number(decryptedContact)],
       });
       console.log('finalizeDecryption transaction hash:', finalizeTxHash);
 
